@@ -152,7 +152,7 @@ function format_url($srcurl, $baseurl) {
  * @param  string  $url     url链接
  * @param  string  $baseurl baseurl链接
  * @param  boolean $type    为false时 则表示二级域名或多级域名为非本站链接
- * @return boolean           站内链接返回true 站外链接返回false
+ * @return boolean          站内链接返回true 站外链接返回false
  */
 function check_chain($url, $baseurl, $type=true) {
     $urlinfo = check_url_valid($url);
@@ -305,7 +305,7 @@ function check_path_valid($path) {
  * @param  string $dest 数据保存路径
  * @param  string $data 数据
  * @param  string $type 写入方式
- * @return void 无返回值
+ * @return void         无返回值
  */
 function save_data($dest, $data, $type='w') {
     $pathinfo = check_path_valid($dest);
@@ -322,9 +322,9 @@ function save_data($dest, $data, $type='w') {
  * 主函数：提取站内所有链接
  * @param  string $url          入口链接
  * @param  string $crawled_logs 已抓取链接日志保存路径
- * @param string $error_logs    错误链接日志保存路径
+ * @param  string $error_logs   错误链接日志保存路径
  * @param  array  $ignore_urls  需要忽略的url数组
- * @return void 无返回值
+ * @return void                 无返回值
  */
 function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()) {
 
@@ -468,15 +468,3 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
     echo "程序执行结束！";
 
 }
-
-set_time_limit(10000);
-ignore_user_abort(false);
-
-$ignore_urls = array(
-    "fr.example.com",
-    "ru.example.com",
-    "pt.example.com",
-    "es.example.com"
-);
-
-get_site_links('http://www.example.com', 'logs/crawled_links.log', 'logs/error_links.log', $ignore_urls);
