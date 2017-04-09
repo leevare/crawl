@@ -20,6 +20,12 @@ function check_url_valid($url) {
 function get_links($url, $data) {
 	$urlinfo = check_url_valid($url);
     $baseurl = $urlinfo['scheme'].'://'.$urlinfo['host'];
+    if(@$urlinfo["port"]) {
+        $baseurl .= ":".@$urlinfo["port"];
+    }
+    if(@$urlinfo["path"]) {
+        $baseurl .= "/".@$urlinfo["path"];
+    }
     if(empty($data)) $data = get_url($url);
     return array(
         "link"=>__get_links($data, $baseurl, 'link'),
@@ -37,10 +43,10 @@ function get_links($url, $data) {
  * @return array            链接数组
  */
 function __get_links($data, $baseurl, $linktype) {
-    $link_pattern = "/<a.*?href=['\"](.+?)['\"].*?<\/a>/i";
-    $img_pattern = "/<img.*?src=['\"](.+?)['\"]/i";
-    $script_pattern = "/<script.*?src=['\"](.+?)['\"].*?<\/script>/i";
-    $css_pattern = "/<link.*?href=['\"](.+?)['\"]/i";
+    $link_pattern = "/<a.*?href=['\"](.*?)['\"].*?<\/a>/i";
+    $img_pattern = "/<img.*?src=['\"](.*?)['\"]/i";
+    $script_pattern = "/<script.*?src=['\"](.*?)['\"].*?<\/script>/i";
+    $css_pattern = "/<link.*?href=['\"](.*?)['\"]/i";
     $innerUrls = array();   #内链
     $outerUrls = array();   #外链
     switch ($linktype) {
@@ -62,8 +68,8 @@ function __get_links($data, $baseurl, $linktype) {
         foreach ($links as $link) {
             @ob_flush();
             @flush();
-            $real_url = format_url($link, $baseurl);
-            $real_url = trim_link($real_url);
+            $t_link = trim_link($link);
+            $real_url = format_url($t_link, $baseurl);
             if($real_url) {
                 if(check_chain($real_url, $baseurl)) {
                     array_push($innerUrls, $real_url);
@@ -88,6 +94,7 @@ function __get_links($data, $baseurl, $linktype) {
  * @return string          url绝对路径
  */
 function format_url($srcurl, $baseurl) {
+    if(!$srcurl) return false;
     $srcinfo = parse_url($srcurl);
     if(isset($srcinfo['scheme'])) {
         $filename = basename(@$srcinfo['path'], '.index.html');
@@ -99,6 +106,9 @@ function format_url($srcurl, $baseurl) {
         return $srcurl;
     }
     $baseinfo = parse_url($baseurl);
+    if(!@$srcinfo['scheme'] && @$srcinfo['host'] && strpos($srcurl, "//") === 0) {
+        return $baseinfo['scheme'].":".$srcurl;
+    }
     $url = $baseinfo['scheme'].'://'.$baseinfo['host'];
     if(substr(@$srcinfo['path'], 0, 1) == '/') {
         $path = $srcinfo['path'];
@@ -110,7 +120,7 @@ function format_url($srcurl, $baseurl) {
             $path = dirname(@$baseinfo['path']).'/'.$filename.'/'.@$srcinfo['path'];
         }else {
             #反之，则直接跟在baseurl之后
-            $path = dirname($baseinfo['path']).'/'.$srcinfo['path'];
+            $path = dirname(@$baseinfo['path']).'/'.@$srcinfo['path'];
         }
     }
     $rst = array();
@@ -196,10 +206,15 @@ function trim_link($link) {
     $scheme = @$linkinfo['scheme'];
     $host = @$linkinfo['host'];
     $path = @$linkinfo['path'];
-    preg_match($invalid_link_pattern, $host.$path, $m);
-    if($scheme === "http" || $scheme === "https" && !@$m[1] && $host) {
-        return $link;
+    $reg_link = '';
+    if($scheme === "http" || $scheme === "https") {
+        $reg_link = $host.$path;
+    }else if(!$host) {
+        $reg_link = $link;
     }
+    preg_match($invalid_link_pattern, $reg_link, $m);
+
+    if(!@$m[1]) return $link;
 }
 
 /**
@@ -211,7 +226,7 @@ function trim_link($link) {
 function get_url($url, $output = true) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 5.1; rv:1.7.3) Gecko/20041001 Firefox/0.10.1");
+    curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
     curl_setopt($ch, CURLOPT_HEADER, 0);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, $output);
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
@@ -222,7 +237,8 @@ function get_url($url, $output = true) {
     }
     $content = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    if($httpCode == 404) {
+    print_r($httpCode);
+    if($httpCode == 404 || $httpCode == 403) {
         return false;
     }
     curl_close($ch);
@@ -274,16 +290,21 @@ function get_thread_url($urls) {
     }   
   
     foreach ($curl as $k => $v) {  
-        if (curl_error($curl[$k]) == "") {  
-            $text[$urls[$k]] = (string) curl_multi_getcontent($curl[$k]);   
+        if (curl_error($curl[$k]) == "") {
+            $tx = (string) curl_multi_getcontent($curl[$k]);
+            #去除注释部分内容
+            $pre_text = preg_replace("/<!--[\s\S]*?-->/", "", $tx);
+            $text[$urls[$k]] = $pre_text;
         }
         if(curl_getinfo($curl[$k], CURLINFO_HTTP_CODE) == 404) {
             $text[$urls[$k]] = 404;
+        }else if(curl_getinfo($curl[$k], CURLINFO_HTTP_CODE) == 403) {
+            $text[$urls[$k]] = 403;
         }
         curl_multi_remove_handle($handle, $curl[$k]);  
         curl_close($curl[$k]);
     }   
-    curl_multi_close($handle);  
+    curl_multi_close($handle);
     return $text;  
 }
 
@@ -305,7 +326,7 @@ function check_path_valid($path) {
  * @param  string $dest 数据保存路径
  * @param  string $data 数据
  * @param  string $type 写入方式
- * @return void         无返回值
+ * @return void 		无返回值
  */
 function save_data($dest, $data, $type='w') {
     $pathinfo = check_path_valid($dest);
@@ -324,7 +345,7 @@ function save_data($dest, $data, $type='w') {
  * @param  string $crawled_logs 已抓取链接日志保存路径
  * @param  string $error_logs   错误链接日志保存路径
  * @param  array  $ignore_urls  需要忽略的url数组
- * @return void                 无返回值
+ * @return void 				无返回值
  */
 function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()) {
 
@@ -344,9 +365,7 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
     $crawled_urls = array();#已爬过的链接数组
     $error_urls = array();#错误链接数组
     $pending_ex_urls = array();
-    $pending_urls["url"] = array();
-    $pending_urls["from"] = array();
-    array_push($pending_urls["url"], $url);
+    $pending_urls["url"][] = $url;
 
     do{
 
@@ -356,8 +375,8 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
         if(!empty($pending_ex_urls)) {
             foreach($pending_ex_urls as $pending_ex_url) {
                 $pending_ex_url_array = explode("||", $pending_ex_url);
-                array_push($pending_urls["url"], trim($pending_ex_url_array[0]));
-                $pending_urls["from"][$pending_ex_url_array[0]] = trim($pending_ex_url_array[1]);
+                $pending_urls["url"][] = trim($pending_ex_url_array[0]);
+                $pending_urls["from"][$pending_ex_url_array[0]][] = trim($pending_ex_url_array[1]);
             }
         }
 
@@ -399,37 +418,44 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
             break;
         }
 
-        #抓取待抓取数组中的链接
-        $datas = get_thread_url($pending_crawl_urls);
+        #设置分组 每次多线程最多抓取100个url
+        $pending_crawl_urls_groups = array_chunk($pending_crawl_urls, 100);
+        foreach ($pending_crawl_urls_groups as $pending_crawl_urls_group) {
+            #抓取待抓取数组中的链接
+            $datas = get_thread_url($pending_crawl_urls_group);
 
-        foreach ($pending_crawl_urls as $pending_crawl_url) {
-            array_push($crawled_urls, $pending_crawl_url);#将抓取过的链接添加到已抓数组中
-            save_data($crawled_logs, $pending_crawl_url."\r\n", 'ab');#将已爬过的链接保存到日志
-        }
+            foreach ($pending_crawl_urls_group as $pending_crawl_url) {
+                array_push($crawled_urls, $pending_crawl_url);#将抓取过的链接添加到已抓数组中
+                save_data($crawled_logs, $pending_crawl_url."\r\n", 'ab');#将已爬过的链接保存到日志
+            }
 
-        echo "当前已抓取".count($crawled_urls)."个链接。\r\n<br>";
+            echo "当前已抓取".count($crawled_urls)."个链接。\r\n<br>";
 
-        #抓取获取抓到的数据中的链接
-        if($datas) {
-            foreach($datas as $k => $data) {
-                if($data === 404) {
-                    #将404错误的链接保存到错误url数组中
-                    if(!in_array($k, $error_urls)) {
-                        array_push($error_urls, $k.",".$pending_urls["from"][$k]);
-                    }
-                }else {
-                    $page_links = get_links($k, $data)['link']['inner'];
-                    if($page_links) {
-                        #检测链接是否在已抓取过的数组中,如不在则写入文本文件中
-                        foreach($page_links as $page_link) {
-                            if(!in_array(trim($page_link), $crawled_urls)) {
-                                save_data($file, $page_link."||{$k}\r\n", 'ab');
+            #抓取获取抓到的数据中的链接
+            if($datas) {
+                foreach($datas as $k => $data) {
+                    if($data === 404 || $data === 403) {
+                        #将404错误的链接保存到错误url数组中
+                        if(!in_array($k, $error_urls)) {
+                            foreach($pending_urls["from"][$k] as $pending_from_url) {
+                                array_push($error_urls, $k.",".$pending_from_url);
+                            }
+                        }
+                    }else {
+                        $page_links = get_links($k, $data)['link']['inner'];
+                        if($page_links) {
+                            #检测链接是否在已抓取过的数组中,如不在则写入文本文件中
+                            foreach($page_links as $page_link) {
+                                if(!in_array(trim($page_link), $crawled_urls)) {
+                                    save_data($file, $page_link."||{$k}\r\n", 'ab');
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
 
     }while(($pending_ex_urls = file($file)));
 
