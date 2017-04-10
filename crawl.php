@@ -226,7 +226,7 @@ function trim_link($link) {
 function get_url($url, $output = true) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko");
+    curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows; U; Windows NT 5.1; rv:1.7.3) Gecko/20041001 Firefox/0.10.1");
     curl_setopt($ch, CURLOPT_HEADER, 0);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, $output);
     curl_setopt($ch, CURLOPT_TIMEOUT, 20);
@@ -459,6 +459,21 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
 
     }while(($pending_ex_urls = file($file)));
 
+    $img_exts = array(".jpg",".png",".jpeg",".gif");
+
+    #去除链接中的图片链接
+    foreach($crawled_urls as $key => $crawled_url) {
+        $urlname = @strtolower(basename($crawled_url));
+        if($urlname) {
+            foreach($img_exts as $img_ext) {
+                if(strpos($urlname, $img_ext) !== false) {
+                    unset($crawled_urls[$key]);
+                    break;
+                }
+            }
+        }
+    }
+
     #保存错误的链接信息
     if(!empty($error_urls)) {
         $error_urls_str = implode("\r\n", $error_urls);
@@ -476,10 +491,10 @@ function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()
                 unset($crawled_urls[$key]);
             }
         }
-        array_filter($crawled_urls);
-        $crawled_urls_str = implode("\r\n", $crawled_urls);
-        save_data($crawled_logs, $crawled_urls_str, 'w');
     }
+    array_filter($crawled_urls);
+    $crawled_urls_str = implode("\r\n", $crawled_urls);
+    save_data($crawled_logs, $crawled_urls_str, 'w');
 
     #打印日志
     echo "发现错误链接 ".count($error_urls)." 个，正常链接 ".count($crawled_urls)." 个。<br>";
