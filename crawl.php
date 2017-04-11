@@ -326,7 +326,7 @@ function check_path_valid($path) {
  * @param  string $dest 数据保存路径
  * @param  string $data 数据
  * @param  string $type 写入方式
- * @return void 		无返回值
+ * @return void         无返回值
  */
 function save_data($dest, $data, $type='w') {
     $pathinfo = check_path_valid($dest);
@@ -345,18 +345,21 @@ function save_data($dest, $data, $type='w') {
  * @param  string $crawled_logs 已抓取链接日志保存路径
  * @param  string $error_logs   错误链接日志保存路径
  * @param  array  $ignore_urls  需要忽略的url数组
- * @return void 				无返回值
+ * @return void                 无返回值
  */
 function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()) {
 
     $urlinfo = check_url_valid($url);
+    $urlname = @basename($url);
     
-    if(!@$urlinfo['path']) {
-        $url = $url."/";
-    }else {
-    	if(substr(@$urlinfo['path'], -1, 1) !== "/") {
-    		$url = $url."/";
-    	}
+    if(!$urlname) {
+        if(!@$urlinfo['path']) {
+            $url = $url."/";
+        }else {
+            if(substr(@$urlinfo['path'], -1, 1) !== "/") {
+                $url = $url."/";
+            }
+        }
     }
 
     $file = 'links.txt'; #临时文件
