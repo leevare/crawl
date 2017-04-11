@@ -1,6 +1,6 @@
-<?php 
+<?php
 /**
- * 检查URL有效性 
+ * 检查URL有效性
  */
 function check_url_valid($url) {
     $urlinfo = parse_url($url);
@@ -18,7 +18,7 @@ function check_url_valid($url) {
  * @return array        链接数组
  */
 function get_links($url, $data) {
-	$urlinfo = check_url_valid($url);
+    $urlinfo = check_url_valid($url);
     $baseurl = $urlinfo['scheme'].'://'.$urlinfo['host'];
     if(@$urlinfo["port"]) {
         $baseurl .= ":".@$urlinfo["port"];
@@ -251,15 +251,15 @@ function get_url($url, $output = true) {
  * @return array       抓取后的信息数组
  */
 function get_thread_url($urls) {
-	if (!is_array($urls) or count($urls) == 0) {  
-        return false;  
-    }   
-    $num=count($urls);  
-    $curl = $text = array();  
-    $handle = curl_multi_init();  
-    
+    if (!is_array($urls) or count($urls) == 0) {
+        return false;
+    }
+    $num=count($urls);
+    $curl = $text = array();
+    $handle = curl_multi_init();
+
     foreach($urls as $k=>$url){
-    	$curl[$k] = curl_init($url);
+        $curl[$k] = curl_init($url);
         curl_setopt ($curl[$k], CURLOPT_URL, $url);
         curl_setopt ($curl[$k], CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 6.1; Trident/7.0; rv:11.0) like Gecko');//设置头部
         curl_setopt ($curl[$k], CURLOPT_REFERER, $url); //设置来源
@@ -274,22 +274,22 @@ function get_thread_url($urls) {
             curl_setopt($curl[$k], CURLOPT_SSL_VERIFYHOST, false);
         }
         curl_multi_add_handle ($handle,$curl[$k]);
-    }  
-    $active = null;  
-    do {  
-        $mrc = curl_multi_exec($handle, $active);  
-    } while ($mrc == CURLM_CALL_MULTI_PERFORM);  
-  
-    while ($active && $mrc == CURLM_OK) {  
-        if (curl_multi_select($handle) != -1) {  
-            usleep(100);  
-        }  
-        do {  
-            $mrc = curl_multi_exec($handle, $active);  
-        } while ($mrc == CURLM_CALL_MULTI_PERFORM);  
-    }   
-  
-    foreach ($curl as $k => $v) {  
+    }
+    $active = null;
+    do {
+        $mrc = curl_multi_exec($handle, $active);
+    } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+
+    while ($active && $mrc == CURLM_OK) {
+        if (curl_multi_select($handle) != -1) {
+            usleep(100);
+        }
+        do {
+            $mrc = curl_multi_exec($handle, $active);
+        } while ($mrc == CURLM_CALL_MULTI_PERFORM);
+    }
+
+    foreach ($curl as $k => $v) {
         if (curl_error($curl[$k]) == "") {
             $tx = (string) curl_multi_getcontent($curl[$k]);
             #去除注释部分内容
@@ -301,11 +301,11 @@ function get_thread_url($urls) {
         }else if(curl_getinfo($curl[$k], CURLINFO_HTTP_CODE) == 403) {
             $text[$urls[$k]] = 403;
         }
-        curl_multi_remove_handle($handle, $curl[$k]);  
+        curl_multi_remove_handle($handle, $curl[$k]);
         curl_close($curl[$k]);
-    }   
+    }
     curl_multi_close($handle);
-    return $text;  
+    return $text;
 }
 
 /**
@@ -350,14 +350,14 @@ function save_data($dest, $data, $type='w') {
 function get_site_links($url, $crawled_logs, $error_logs, $ignore_urls = array()) {
 
     $urlinfo = check_url_valid($url);
-    $urlname = @basename($url);
-    
-    if(!$urlname) {
-        if(!@$urlinfo['path']) {
-            $url = $url."/";
-        }else {
-            if(substr(@$urlinfo['path'], -1, 1) !== "/") {
-                $url = $url."/";
+
+    if(!@$urlinfo['path']) {
+        $url = $url."/";
+    }else {
+        if(substr(@$urlinfo['path'], -1, 1) !== "/") {
+            $path_array = explode("/", @$urlinfo['path']);
+            if(strpos(end($path_array), ".") === false) {
+                $url .= "/";
             }
         }
     }
